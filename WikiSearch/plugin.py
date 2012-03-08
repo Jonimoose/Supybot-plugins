@@ -32,6 +32,7 @@
 import string
 import StringIO
 import urllib
+import re
 from wikitools import wiki, api
 import supybot.utils as utils
 from supybot.commands import *
@@ -52,7 +53,6 @@ class WikiSearch(callbacks.Plugin):
         Returns the first result of a Wikipedia search"""
         
         APIURL="http://en.wikipedia.org/w/api.php"
-        PAGEURL="http://en.wikipedia.org/wiki/"
         
         site = wiki.Wiki(APIURL)
         params = {'action':'query',
@@ -60,10 +60,12 @@ class WikiSearch(callbacks.Plugin):
             'srlimit':1,
             'srsearch':search,
             'srprop':'titlesnippet',
-            'srwhat':'title'
+            'meta':'siteinfo',
+            'siprop':'general'
         }
         req = api.APIRequest(site, params)
         res = req.query(querycontinue=False)
+		
         if len(res['query']['search']):
             result = title =  res['query']['search'][0]['title']
         else:
@@ -74,7 +76,9 @@ class WikiSearch(callbacks.Plugin):
             else:
                 title = 'Special:Search'
                 result = 'No results Found'
-        irc.reply(result + " - " + PAGEURL + urllib.urlencode({ "title" : title }))
+        pageurl = ' '
+        pageurl = res['query']['general']['server'] + res['query']['general']['articlepath']
+        irc.reply(result + " - http:" + re.sub(r'\$1', urllib.quote(title), pageurl))
 
     wiki = wrap(wiki, ['text'])
 
