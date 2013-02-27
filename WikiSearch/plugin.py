@@ -86,21 +86,28 @@ class WikiSearch(plugins.ChannelIdDatabasePlugin):
         req = api.APIRequest(site, params)
         res = req.query(querycontinue=False)
 
-        if len(res['query']['search']):
-            result = title =  res['query']['search'][0]['title']
-        else:
+        if not len(res['query']['search']):
             req.changeParam('srwhat','text')
             res = req.query(querycontinue=False)
-            if len(res['query']['search']):
-                result = title =  res['query']['search'][0]['title']
-            else:
-                title = 'Special:Search'
-                result = 'No results Found'
-        pageurl = ' '
-        pageurl = res['query']['general']['server'] + res['query']['general']['articlepath']
+
+        if len(res['query']['search']):
+            result = title =  res['query']['search'][0]['title']
+            params = {'action':'query',
+                'titles':title,
+                'prop':'info',
+                'inprop':'url'
+                }
+            req = api.APIRequest(site, params)
+            res = req.query(querycontinue=False)
+            pageurl = res['query']['pages'].values()[0]['fullurl']
+        else:
+            title = 'Special:Search'
+            result = 'No results Found'
+            pageurl = ''
+
         if not 'http' in pageurl:
             pageurl = 'http:' + pageurl
-        irc.reply(result + " - " + re.sub(r'\$1', urllib.quote(title), pageurl))
+        irc.reply(result + " - " + pageurl)
 
     wiki = wrap(wiki, ['channeldb', optional('id'), 'text'])
 
