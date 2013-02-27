@@ -41,20 +41,40 @@ import supybot.ircutils as ircutils
 import supybot.callbacks as callbacks
 
 
-class WikiSearch(callbacks.Plugin):
+class WikiSearch(plugins.ChannelIdDatabasePlugin):
     """Add the help for "@plugin help WikiSearch" here
     This should describe *how* to use this plugin."""
     threaded = True
 
+    def addValidator(self, irc, apiurl):
+        try:
+            site = wiki.Wiki(apiurl)
+        except:
+            irc.error('Invalid mediawiki api.php url')
 
-    def wiki(self, irc, msg, args, search):
-        """<search term>
 
-        Returns the first result of a Wikipedia search"""
-        
-        APIURL="http://en.wikipedia.org/w/api.php"
-        
-        site = wiki.Wiki(APIURL)
+    def wiki(self, irc, msg, args, channel, id, search):
+        """[<channel>] [<id>] <search term>
+
+        Returns the first result of a search on [wikiname]. Uses default wiki
+        if none specified. <channel> is only necessary if the message isn't
+        sent in the channel itself.
+        """
+
+        if id is None:
+            id = self.registryValue('defaultWiki')
+
+        try:
+            apiurl = self.db.get(channel, id).text
+        except KeyError:
+            irc.error(format('There is no wiki with id #%i.', id))
+            return
+
+        if not id:
+            irc.error(format('There are no Wikis in my database ' \
+                                 'for %s.', channel))
+
+        site = wiki.Wiki(apiurl)
         params = {'action':'query',
             'list':'search',
             'srlimit':1,
@@ -65,7 +85,7 @@ class WikiSearch(callbacks.Plugin):
         }
         req = api.APIRequest(site, params)
         res = req.query(querycontinue=False)
-		
+
         if len(res['query']['search']):
             result = title =  res['query']['search'][0]['title']
         else:
@@ -78,9 +98,11 @@ class WikiSearch(callbacks.Plugin):
                 result = 'No results Found'
         pageurl = ' '
         pageurl = res['query']['general']['server'] + res['query']['general']['articlepath']
-        irc.reply(result + " - http:" + re.sub(r'\$1', urllib.quote(title), pageurl))
+        if not 'http' in pageurl:
+            pageurl = 'http:' + pageurl
+        irc.reply(result + " - " + re.sub(r'\$1', urllib.quote(title), pageurl))
 
-    wiki = wrap(wiki, ['text'])
+    wiki = wrap(wiki, ['channeldb', optional('id'), 'text'])
 
 Class = WikiSearch
 
